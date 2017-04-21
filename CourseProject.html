@@ -141,9 +141,16 @@ urlTest &lt;- &quot;https://d396qusza40orc.cloudfront.net/predmachlearn/pml-test
 <div id="loading-data" class="section level2">
 <h2>Loading Data</h2>
 <p>Before we begin, let’s load all the necessary libraries we need to model.</p>
-<pre class="r"><code>library(caret)
-library(caretEnsemble)
-library(mlbench)</code></pre>
+<pre class="r"><code>library(caret)</code></pre>
+<pre><code>## Loading required package: lattice</code></pre>
+<pre><code>## Loading required package: ggplot2</code></pre>
+<pre class="r"><code>library(caretEnsemble)</code></pre>
+<pre><code>## 
+## Attaching package: 'caretEnsemble'</code></pre>
+<pre><code>## The following object is masked from 'package:ggplot2':
+## 
+##     autoplot</code></pre>
+<pre class="r"><code>library(mlbench)</code></pre>
 <p>Next, we attempt to load the downloaded files above in R.</p>
 <pre class="r"><code>training = read.csv(&quot;pml-training.csv&quot;,na.strings=c(&quot;NA&quot;,&quot;#DIV/0!&quot;,&quot;&quot;))
 testing = read.csv(&quot;pml-testing.csv&quot;,na.strings=c(&quot;NA&quot;,&quot;#DIV/0!&quot;,&quot;&quot;))
@@ -510,6 +517,15 @@ names(trainSmall2)[corrIdx] # these are the columns which are 80% correlated</co
 <div id="model-specification" class="section level2">
 <h2>Model Specification</h2>
 <p>We will build a couple of models from the training data. The first step is to set the same training control parameters to be used across all the models.</p>
+<div id="data-partitioning" class="section level3">
+<h3>Data Partitioning</h3>
+<p>Before we begin, we split the <code>training</code> dataset into a smaller trainSmall and testSmall dataset with the NA columns removed.</p>
+<pre class="r"><code>inTrain &lt;- createDataPartition(y = training$classe, p = 0.7, list = FALSE)
+trainingSet &lt;- training[inTrain,]
+testingSet &lt;- training[-inTrain,]
+trainSmall3 &lt;- trainingSet[,!naCols]
+testSmall3 &lt;- testingSet[,!naCols]</code></pre>
+</div>
 <div id="cross-validation" class="section level3">
 <h3>Cross Validation</h3>
 <p>We select the <strong>Leave-group-out cross validation</strong> method for our pre-processing. Leave Group Out cross-validation (LGOCV), is similar to Leave One Out cross-validation, but the algorithm will randomly leave out some percentage of the data repeatedly. It is different form k-folds as the selection of data rows is random (Monte Carlo cv). We set 75% (<code>p=0.75</code>) of the data for training and the rest for validation.</p>
@@ -521,50 +537,80 @@ trControl &lt;- trainControl(method=&quot;LGOCV&quot;, p=0.75, preProcOptions=li
 <h3>Training</h3>
 <p>Training can be slow, so we are enabling parallel processing before training the models. The code below will automatically perform the necessary setup based on your machine hardware.</p>
 <pre class="r"><code>library(doParallel)
-cl &lt;- makeCluster(4) # detectCores() # Please disable HyperThreading
+cl &lt;- makeCluster(detectCores()) # Please disable HyperThreading
 registerDoParallel(cl)</code></pre>
 <p>We can now train a couple of models from our training data. We set the seed and pre-process the data the <strong>exact same way</strong> for each model to ensure fairness and reproducability before training 9 models using different ML techniques below. They are <code>lda, rf, nnet, svmRadial, gbm, treebag, C5.0, rpart, knn</code>.</p>
 <pre class="r"><code># LDA
 set.seed(123)
-fit.lda &lt;- train(classe ~ .,method=&quot;lda&quot;, preProcess=c(&quot;pca&quot;,&quot;center&quot;,&quot;scale&quot;), data=trainSmall, trControl=trControl)
-# Random Forests
+fit.lda &lt;- train(classe ~ .,method=&quot;lda&quot;, preProcess=c(&quot;pca&quot;,&quot;center&quot;,&quot;scale&quot;), data=trainSmall3, trControl=trControl)</code></pre>
+<pre><code>## Loading required package: MASS</code></pre>
+<pre class="r"><code># Random Forests
 set.seed(123)
-fit.rf &lt;- train(classe ~ .,method=&quot;rf&quot;, preProcess=c(&quot;pca&quot;,&quot;center&quot;,&quot;scale&quot;), data=trainSmall, trControl=trControl)
-# Neural Networks
+fit.rf &lt;- train(classe ~ .,method=&quot;rf&quot;, preProcess=c(&quot;pca&quot;,&quot;center&quot;,&quot;scale&quot;), data=trainSmall3, trControl=trControl)</code></pre>
+<pre><code>## Loading required package: randomForest</code></pre>
+<pre><code>## randomForest 4.6-12</code></pre>
+<pre><code>## Type rfNews() to see new features/changes/bug fixes.</code></pre>
+<pre><code>## 
+## Attaching package: 'randomForest'</code></pre>
+<pre><code>## The following object is masked from 'package:ggplot2':
+## 
+##     margin</code></pre>
+<pre class="r"><code># Neural Networks
 set.seed(123)
-fit.nnet &lt;- train(classe ~ ., method=&quot;nnet&quot;, preProcess=c(&quot;pca&quot;,&quot;center&quot;,&quot;scale&quot;), data=trainSmall, trControl= trControl, verbose=FALSE)</code></pre>
+fit.nnet &lt;- train(classe ~ ., method=&quot;nnet&quot;, preProcess=c(&quot;pca&quot;,&quot;center&quot;,&quot;scale&quot;), data=trainSmall3, trControl= trControl, verbose=FALSE)</code></pre>
+<pre><code>## Loading required package: nnet</code></pre>
 <pre><code>## # weights:  140
-## initial  value 37299.330530 
-## iter  10 value 14460.653452
-## iter  20 value 10993.444205
-## iter  30 value 9199.373266
-## iter  40 value 8709.407967
-## iter  50 value 8209.131228
-## iter  60 value 7884.357952
-## iter  70 value 7382.702864
-## iter  80 value 6864.818231
-## iter  90 value 6348.468680
-## iter 100 value 5985.455912
-## final  value 5985.455912 
+## initial  value 23149.182408 
+## iter  10 value 8772.125087
+## iter  20 value 5430.962700
+## iter  30 value 4691.686011
+## iter  40 value 4252.657487
+## iter  50 value 4014.500407
+## iter  60 value 3739.105485
+## iter  70 value 3397.577033
+## iter  80 value 3196.260763
+## iter  90 value 3011.700122
+## iter 100 value 2886.091747
+## final  value 2886.091747 
 ## stopped after 100 iterations</code></pre>
 <pre class="r"><code># SVM (Radial)
 set.seed(123)
-fit.svm &lt;- train(classe ~ .,method=&quot;svmRadial&quot;, preProc=c(&quot;pca&quot;,&quot;center&quot;,&quot;scale&quot;), data=trainSmall, trControl=trControl)
-# Stochastic Gradient Boosting
+fit.svm &lt;- train(classe ~ .,method=&quot;svmRadial&quot;, preProc=c(&quot;pca&quot;,&quot;center&quot;,&quot;scale&quot;), data=trainSmall3, trControl=trControl)</code></pre>
+<pre><code>## Loading required package: kernlab</code></pre>
+<pre><code>## 
+## Attaching package: 'kernlab'</code></pre>
+<pre><code>## The following object is masked from 'package:ggplot2':
+## 
+##     alpha</code></pre>
+<pre class="r"><code># Stochastic Gradient Boosting
 set.seed(123)
-fit.gbm &lt;- train(classe ~ .,method=&quot;gbm&quot;, preProcess=c(&quot;pca&quot;,&quot;center&quot;,&quot;scale&quot;), data=trainSmall, trControl=trControl, verbose=FALSE)
-# Bagging
+fit.gbm &lt;- train(classe ~ .,method=&quot;gbm&quot;, preProcess=c(&quot;pca&quot;,&quot;center&quot;,&quot;scale&quot;), data=trainSmall3, trControl=trControl, verbose=FALSE)</code></pre>
+<pre><code>## Loading required package: gbm</code></pre>
+<pre><code>## Loading required package: survival</code></pre>
+<pre><code>## 
+## Attaching package: 'survival'</code></pre>
+<pre><code>## The following object is masked from 'package:caret':
+## 
+##     cluster</code></pre>
+<pre><code>## Loading required package: splines</code></pre>
+<pre><code>## Loaded gbm 2.1.3</code></pre>
+<pre><code>## Loading required package: plyr</code></pre>
+<pre class="r"><code># Bagging
 set.seed(123)
-fit.bag &lt;- train(classe ~ .,method=&quot;treebag&quot;, preProcess=c(&quot;pca&quot;,&quot;center&quot;,&quot;scale&quot;), data=trainSmall, trControl=trControl)
-# CART (C5.0) # http://www.statmethods.net/advstats/cart.html
+fit.bag &lt;- train(classe ~ .,method=&quot;treebag&quot;, preProcess=c(&quot;pca&quot;,&quot;center&quot;,&quot;scale&quot;), data=trainSmall3, trControl=trControl)</code></pre>
+<pre><code>## Loading required package: ipred</code></pre>
+<pre><code>## Loading required package: e1071</code></pre>
+<pre class="r"><code># CART (C5.0) # http://www.statmethods.net/advstats/cart.html
 set.seed(123)
-fit.cart &lt;- train(classe ~ .,method=&quot;C5.0&quot;, preProcess=c(&quot;pca&quot;,&quot;center&quot;,&quot;scale&quot;), data=trainSmall, trControl=trControl)
-# RPart
+fit.cart &lt;- train(classe ~ .,method=&quot;C5.0&quot;, preProcess=c(&quot;pca&quot;,&quot;center&quot;,&quot;scale&quot;), data=trainSmall3, trControl=trControl)</code></pre>
+<pre><code>## Loading required package: C50</code></pre>
+<pre class="r"><code># RPart
 set.seed(123)
-fit.rpart &lt;- train(classe ~ .,method=&quot;rpart&quot;, preProcess=c(&quot;pca&quot;,&quot;center&quot;,&quot;scale&quot;), data=trainSmall, trControl=trControl)
-# kNN
+fit.rpart &lt;- train(classe ~ .,method=&quot;rpart&quot;, preProcess=c(&quot;pca&quot;,&quot;center&quot;,&quot;scale&quot;), data=trainSmall3, trControl=trControl)</code></pre>
+<pre><code>## Loading required package: rpart</code></pre>
+<pre class="r"><code># kNN
 set.seed(123)
-fit.knn &lt;- train(classe ~ .,method=&quot;knn&quot;, preProcess=c(&quot;pca&quot;,&quot;center&quot;,&quot;scale&quot;), data=trainSmall, trControl=trControl)
+fit.knn &lt;- train(classe ~ .,method=&quot;knn&quot;, preProcess=c(&quot;pca&quot;,&quot;center&quot;,&quot;scale&quot;), data=trainSmall3, trControl=trControl)
 # terminate parallel threads
 stopCluster(cl)</code></pre>
 </div>
@@ -595,30 +641,66 @@ summary(single_results)</code></pre>
 ## 
 ## Accuracy 
 ##         Min. 1st Qu. Median   Mean 3rd Qu.   Max. NA's
-## lda   0.7631  0.7700 0.7735 0.7738  0.7785 0.7875    0
-## rf    0.9831  0.9857 0.9867 0.9868  0.9876 0.9896    0
-## nnet  0.8740  0.8929 0.9084 0.9062  0.9174 0.9396    0
-## svm   0.9596  0.9613 0.9641 0.9639  0.9659 0.9686    0
-## gbm   0.9105  0.9164 0.9201 0.9206  0.9250 0.9292    0
-## bag   0.9647  0.9682 0.9710 0.9711  0.9721 0.9814    0
-## cart  0.9794  0.9829 0.9841 0.9840  0.9847 0.9882    0
-## rpart 0.2845  0.2845 0.2845 0.2845  0.2845 0.2845    0
-## knn   0.9631  0.9684 0.9702 0.9706  0.9727 0.9763    0
+## lda   0.7463  0.7603 0.7643 0.7674  0.7769 0.7874    0
+## rf    0.9741  0.9782 0.9796 0.9799  0.9811 0.9878    0
+## nnet  0.8360  0.8948 0.9135 0.9077  0.9251 0.9429    0
+## svm   0.9470  0.9502 0.9554 0.9550  0.9592 0.9653    0
+## gbm   0.9056  0.9129 0.9179 0.9176  0.9214 0.9301    0
+## bag   0.9543  0.9563 0.9595 0.9608  0.9630 0.9767    0
+## cart  0.9717  0.9747 0.9776 0.9773  0.9787 0.9843    0
+## rpart 0.2843  0.2843 0.2843 0.2843  0.2843 0.2843    0
+## knn   0.9496  0.9528 0.9581 0.9582  0.9627 0.9677    0
 ## 
 ## Kappa 
 ##         Min. 1st Qu. Median   Mean 3rd Qu.   Max. NA's
-## lda   0.7007  0.7090 0.7137 0.7142  0.7199 0.7315    0
-## rf    0.9786  0.9819 0.9832 0.9833  0.9843 0.9868    0
-## nnet  0.8406  0.8648 0.8840 0.8813  0.8954 0.9237    0
-## svm   0.9489  0.9510 0.9546 0.9544  0.9569 0.9603    0
-## gbm   0.8868  0.8942 0.8989 0.8995  0.9050 0.9105    0
-## bag   0.9554  0.9598 0.9634 0.9634  0.9647 0.9765    0
-## cart  0.9739  0.9783 0.9799 0.9798  0.9807 0.9850    0
+## lda   0.6795  0.6970 0.7023 0.7061  0.7181 0.7311    0
+## rf    0.9672  0.9724 0.9742 0.9746  0.9761 0.9845    0
+## nnet  0.7922  0.8667 0.8906 0.8832  0.9053 0.9279    0
+## svm   0.9329  0.9370 0.9436 0.9430  0.9484 0.9561    0
+## gbm   0.8807  0.8897 0.8961 0.8957  0.9005 0.9116    0
+## bag   0.9422  0.9448 0.9488 0.9504  0.9532 0.9705    0
+## cart  0.9642  0.9679 0.9716 0.9713  0.9731 0.9801    0
 ## rpart 0.0000  0.0000 0.0000 0.0000  0.0000 0.0000    0
-## knn   0.9533  0.9600 0.9623 0.9628  0.9654 0.9701    0</code></pre>
+## knn   0.9362  0.9403 0.9469 0.9471  0.9528 0.9591    0</code></pre>
 <pre class="r"><code>bwplot(single_results)</code></pre>
-<p><img src="data:image/png;base64,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" /><!-- --></p>
+<p><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAqAAAAHgCAMAAABNUi8GAAAA7VBMVEUAAAAAAC4AADoAAFIAAGYAM3MAOjoAOpAAXJEAZmYAZpAAZrYAgP86AAA6AC46ADo6AGY6My46M3M6OmY6OpA6ZmY6gK86kJA6kLY6kNtmAABmAC5mADpmAGZmOgBmOpBmXC5mZmZmgHNmkJBmo5Fmo8xmtttmtv+QMwCQOgCQOjqQOmaQgFKQkDqQkGaQo3OQtpCQxZGQxa+QxcyQ2/+2XAC2ZgC2Zjq2kDq2xXO225C25cy2/9u2///bgC7bkDrbo1Lbtrbb5czb/9vb////o1L/tmb/xXP/25D/5ZH/5a//5cz//7b//9v///9Xj6hbAAAACXBIWXMAAA7DAAAOwwHHb6hkAAAT/klEQVR4nO2dC5/bxBVHRQgYWJuk5VHW2ZZSSh1D6QtnS6EbF3C8m2Dr+3+cavSy/NIdyZLutXzOL6yE7ZG1fx/PSKPVTBACGCbQ3gGAMhAUTIOgYBoEBdMgKJgGQcE0CAqmQVAwDYKCaRAUTIOgYBoEBdMgKJgGQcE0CAqmQVAwDYKCaRAUTIOgYBoEBdMgKJgGQcE0CAqmQVAwDYKCaRAUTIOgYBoEBdMgKJgGQcE0CAqmQVAwDYJ2wnoaPL7bW/Uu8zAKgknFMlGpp1XfJ1oNrqvv26OZT5nCDnlngKAdcXvl/u2u+pZZjSfh0suCrY3f+klQ3LfB4uFJtfdx+zb3e6PVOHuddwYI2g2rm1lWfRRWvcssB4uo0vGoQrc2vnzXqwbd2TcvCmXcwq/cPPgk3SHvDEIE7YbCp+j9ge680NVUlcqsv/nBy4GdffOiUMZ9cdwXSOanRbZ9f6kRtBsaEHTuI0GxzPzaz7dCmeXge79j3a0vwjTw8jPcfAEQ1BqnC+p3mFcos/p8UV3Q6AzJ61i3+D7ja99jUAQ1y8mCzv1OlAtlbieeLfZWDep5rFvn9wkR1C4nniR5V1GbMqtx4Kh2YuUWVU/G6gjKSZI5Tutm8uv62du4pwPFfYuaeK/vwqbMelq9iaebyRxRheY+xEiAbLVKmVvf2rD4Pt6CFsq4jnqvCwKFMlU76itlgKBgHAQF0yAomAZBwTQICqZBUDANgoJpmhS0xrbqvP05l7GyH+dTBkE7LWNlP86nDIJ2WsbKfpxPGQTttIyV/TifMgjaaRkr+3E+ZRC00zJW9uN8yiBop2Ws7Mf5lKkvaADQAO0J+itIkJEIgmpCRiIIqgkZiSCoJmQk0jdBXwSfqrxvPRQFffHOz27xKnhPbx986Jmg9x/+8e0fNd64HuqCvgq+0tsFL3om6Mu3/zOyHnkBbUFfvfWd3h740S9B3zx/L/oXr74Mgrj1Spavx5G20Y/Xz/4aRFXsi+jBrzavehG/UKGtUxY08zON4/7Dv48Cd4iUr/y6SUqLfgnqEn8Zp+5+vh5/mi1zQceu4nBCxi9Ln30VOfvmucLnoCto7mcax/0octE1+vnKJik1+iWoqxaclsmPX4vLTFD35LMo8fvoUKD47P2HCh+DqqD/CxLz8jjuRy6Ol+/8nK/kT+nRK0GTYF9E9WEWarbcCJqG/SqIa4r0/6KK4mVyVtstmoIGb/3reX5CWYgjqlfzlfwpPXol6Mv08u2mPsyW24JGr4tPpvJaM2rjX2h0T2kKGh/dxMfd23E4QbOV/Ck9+iRoen7kYi+tQeMHkzYtjf71s38+0zjQUj+Lj0+J8jj2BM2f0qNPgmYH/dFR/f4xaPJJxIK6c6L4HCB7NlL7NxotvLqg8QlQHkd6hJQdg7rTqOwpPfokaHpxJA7aJe9q1HT55vk7P795Hmxq0NdjV3lkr4qaMpULUOqCvokOQ/M47kdO19jUfCVLSo0eCbppitxp0nY/qIs5+HPhGPSt717E/Uzpq1TO4Q0IGoX29o9ZHPejP42SDtFspZCUFj0S9BTuf6vRwhv7Y5H8G6571LkNgsa81GnFbGV0aYICNEB7gtYueTmQkQiCakJGIgiqCRmJIKgmZCSCoJqQkQiCakJGIgiqCRmJIKgmZCSCoJqQkQiCakJGIgiqCRmJIKgmZCSCoJqQkQiCdsNwODzwKBltGNaLCEGbAUElEFQVBJVAUF0QVOJgQgjaFQgq0Y2gt8FgUa9kvwkCBBU4fHdHw4KubmY1S/Yad2/NoUMsMsqpG1HFCB+e3tUs2Wvi8IP9+Mkop25EFSJ8+OgP7mswqV6y7yThB/vxk1FG7YiqCDqaUIMeBEFFOhH0yQxBD0MTL9JFEx/JiaAH4SRJpIOTJAQtgW4mkda7mRC0DDrqJVrvqEfQErgWL8G1eFUQVAJBVUFQCQRVBUElEFQVBJVAUIOQkQiCakJGIgiqCRmJIKgmZCSCoJqQkQiCakJGIgiqCRmJIKgmZCSCoJqQkQiCakJGIgiqCRmJIKgmZCSCoJqQkQiCakJGIgiqCRmJIKgmZCSCoJqQkQiCakJGIgjaCe52hgM3NJBRzpBbPjRBUAkXEIKqgaASCKoKgkogqC71Bh66JA5+gxG0K+oN3XZJHB7/D0E7IYg58Hj3u2KUYwk1LGhhcDvCL4CgEgiqSRAcyZ+MUo4mdJqgD6N4Uo9ltOWrdJKPR8yTtA+CSrQj6GocT+vhFstHs51JPgi/AE28RCtN/DKb9TCeYW5nkg/CL4CgEq0IOk8FdS19VINujwBO+FvQzSTRQjdTWoO6qtPVoAhaAh31Ei101MfHoE9my8d34W1agz6ZeZW8PBBUoo0rSclZ/HoaBJ9NJ07QaHXiVfLS4Fq8BNfiVUFQCQRVBUElEFQVBJVAUFUQVIJbPixCRiIIqgkZiSCoJmQkgqCakJEIgmpCRiIIqgkZiSCoJmQkgqCakJEIgmpCRiIIqgkZiSCoJmQkgqCakJEIgmpCRiIIqgkZiSCoJmQkgqCakJEIgmpCRiIIqgkZiSBo6xy53cNBRo74Xo8jCSFo+wyPjUlARglxPAiqBoIKIKguR/Uko4SSgBC0AxBUAEF1OTKuYPxUl/thlpKAThR0PZ0cf5LwY5KRWQ8PSkBGYRZQeCQhBG2bVNDDZwFktBH0yHkSgrZL6qcLg6FvDhFkTUxY7zssCPpFEFxn03y44UI/mDI+6BYIKtCyoIPFajxJp/lwizkD2O5AEy/QehN/e+VWVzczN2S9k9RzyxdCfg5w8Mmu98Yg2fwerZ0kza/SaT7cpB9rmvg96GYSaLmb6fY6neaDGvQwdNQLtNdR745BH0aTdJoPjkEPw7V4gfauxadn8ek0H66lf/+GuTp3QVCBLv9YZIWgeyCoQFeCukNR19pXL9lvEFSgsxp0XpyNm/Az+It6Af6i3ixkJIKgmpCRCIJqQkYiCKoJGYkgqCZkJIKgmpCRCIJqQkYiCKoJGYkgqCZkJIKgmpCRCIJqQkYiCKoJGYkgqCZkJIKgmpCRCIJqQkYiCKoJGYkgqCZkJIKgmpCRCIK2zXB4bGRBMnIk+dQeOgBBT8Wlj6DHSW5IQlA1ELQcBFUGQctBUG0Ym6mcknuOQwTtAAQtp0VBGQLcB4ZfLGfILB+aZOOzHn6y012xST4E9ZGnpeJlTyKoDIIKtC3oMrh+ePqtG4UxXfhu+TJI5wg4EgYZCQGdLujy0Sx8GF27Ye3She+WLwMEFWhZ0C+fzJJxFx+e3qUL3y1fCDTxAu028YPv3fxIkZVO0GThu+ULAUEFyivQk5t4N6QygpZCN1M5LXczLQcLBC2FjvpyWu6oX0+vELQMrsWXw7V4ZRC0HARVBkHLQVBlELQcBFWGWz7K4ZYPw5CRCIJqQkYiCKoJGYkgqCZkJIKgmpCRCIJqQkYiCKoJGYkgqCZkJIKgmpCRCIJqQkYiCKoJGYkgqCZkJIKgmpCRCIJqQkYiCKoJGYkgqCZkJIKgmpCRCIJqQkYiCNoypTc0kJF0xweCtk2cPoIeRbhnDkHbBkHLQVBtTkn/Eigf+QZBWwdBy0FQZcrGbiMjaXA7BG2Z8uFZyUgavxZBWwZBBRBUFWEEdjKShqg/SdBlEDyauRFB19O/TL8cBVcP0X/eW74IEFSgTUHd6N/LwS/TSfjw8S/TwWI1HizcRAqeW74MaOIFWmziV+N4Gq/5VTi/TsZanhSn9iJ8x2lzrFwAQgV6UhO/GgdBXH1+PUPQo9DNVE673Uxu4q5//+PjBYIehY76ctrrqHfHm07QZXAdIugxuBZfTpvX4uOz+Kil//0dgh4FQcvhj0WUQdByEFQZBC0HQZXhL+rL4S/qLUNGIgiqCRmJIKgmZCSCoJqQkQiCakJGIgiqCRmJIKgmZCSCoJqQkQiCakJGIgiqCRmJIKgmZCSCoJqQkQiCakJGIgiqCRmJIKgmZCSCoJqQkQiCakJGIgiqCRmJIGgbDN2dDOX3e8dcZkbD5D4YOR4HgrZBeqMcgh4kywZB1UDQMhBUHQQtA0ENUHYn7YZLzcjXzhBB2wJBy+hQ0MJgTBVL9pvyMQXzV7W+HzYRhlwsgqBtkI7KyjHoQYa+8TgQtA0QtIyOBH0YBR9MJ+vpF0E8PiiTKGzIZgZA0IN4xxO/uO7zboT6eRAJ6mZPSBdMopCAoKV0I+hysAhjM6Mm/vaKAWy3oIkvo5smfh4Jup4mgs4RdBtp6or8de3vikV844lfW/f5rRqUaWh2oZupjC66mQrHoA+jCYLuQEd9GZ101Een7O/fzPKzeAQtwLX4Mrq7Fu8mQ6y95T6DoGV0I2g2S1LtLfcZBC2joxp0nsySVHvLfQZBy+DP7dThlo8yuOXjbCAjEQTVhIxEEFQTMhJBUE3ISARBNSEjEQTVhIxEEFQTMhJBUE3ISARBNSEjEQTVhIxEEFQTMhJBUE3ISARBNSEjEQTVhIxEEFQTMhJBUE3ISARBNSEjEQTVhIxEELQp8hsYhhlbjx7kMjIqZjAcbsVz+l0xCOrLcHcFQVOGB9cRtGMQ9BgIagIEPQaC2mK4syzh8jLaFVQEQRvHJe8GF0TQA8ShxEMvImhXDHeiHobeAwj3O6PdYOLHQu/RfROaFfTh6Wawpn6Hv2G4e7S5JegFH4MODx1n7gra8THoBQqaa7gRNBuDPQwvWdDh9o/80e0R6tsT9OHpt25g0HQRrsbB47vox6NLm0RhI2jyIyL/CPLu6GP0OaOCoGkOyXI7nRYFHV274RfThRu4dj5YXGANShN/DOUm3o0PGvmYLSIzVzezSxQ03L1oh6ApWfOhJGjkYmqmW4wCN1zoRQq6C91MJXTXzbQjaGImgoZ01JfSXUf9tqDuGDRt8H233FsQtAQtQcPkBH49DS52lg+uxR+Da/EmQNBjIKgJEPQYCGoCBD0GgppgIyi3fGyzJSi3fJwTZCSCoJqQkQiCakJGIgiqCRmJIKgmZCSCoJqQkQiCakJGIgiqCRmJIKgmZCSCoJqQkQiCakJGIgiqCRmJIKgmZCSCoJqQkQiCakJGIgiqCRmJIKgmZCSCoBXYDDDke9OswPlnlEfSXCjbIGgFhpv/EDRhM64fguqDoHsgqCUQdA8EtcbWWLWn0o+MPO/PrAeCVgRB97AtaDqg3epmtvNEP8Lfw3NgRc+NNbUhVXwGO6+/8ROfvyhBC0PTcgyakEVi9xgUQU/g/DM6D0GXQfB+JGi0CK78S54fhfk7EDRhE4lhQVfjSTh/NHOLZa9n+SjO39HIBs8/o4KgTYWyTROCLgeLrIkvtPTnH/4eNPF7nEUTP08FdTMp9LoGDf0nOfTcXFMbUqTZg579zZ/4fKEGdQPU97sGddDNtIf5bqb0GHT5+C687XkNSkf9Aex31Edt++9uZutpEHw27fMkClyL34Nr8ZZA0D0Q1BIIugeCWgJB90BQS3DLxx7c8tFryEgEQTUhIxEE1YSMRBBUEzISQVBNyEgEQTUhIxEE1YSMRBBUEzISQVBNyEgEQTUhIxEE1YSMRBBUEzISQVBNyEgEQTUhIxEE1YSMRBBUEzISQVBNyEgEQTUhI5GzFLSlW7C7Zy+j3vxmjYGgmiCoCIJqgqAiCKoJgoogqCYIKnKOgga9Ofnd/UX685s1xvkJmo1H2Qe2f40+/WaN0ayg6YwKNUr606ePEUFFzk7QzTwGPWDrt+jVb9YYdQV9+OgPj//79d/iaT2S2T2iR4IOhgDv1ceIoCK1BR1NwvX08d1qfJ3O7uEeoYmvBk28SG1Bn8wiQSdhOI9nRkqHqEfQaiCoSG1BIxVjQZeDRTK7RzwWeAeC9qkzhm4mkZMFnV+ls3t0J2h/urPpqBc5TdDBIjoATWf3iAV9MhNLNkBvPkYEFTlN0C+C4DpMZ/dIHgm6mOWjNx8jgoqc0g+63sw5U2PLJ9CbjxFBRRBUEwQVQVBNEFTk/P5YJOzRx4igImcpaG8gIxEE1YSMRBBUEzISQVBNyEgEQTUhIxEE1YSMRBBUEzISQVBNyEgEQTUhIxEE1YSMRBBUEzISQVBNyEikRUEBGqA1QRvZVp23P+cyVvbjfMogaKdlrOzH+ZRB0E7LWNmP8ymDoJ2WsbIf51MGQTstY2U/zqcMgnZaxsp+nE8ZBO20jJX9OJ8ydCWDaRAUTIOgYBoEBdMgKJgGQcE0CAqmQVAwDYKCaZoQdD0NHt/trfoWcVM0lA3zeKjM9pRi3rsWXFcsE+3bZmKocvId8o0AvGhC0Nsr92931bNIOgtTtbeJ/sdPguKuDRbFIfZ9923u90arcfY63wjAiwYEXd3kEygVVn2LLAcLYaTc/TJRqXe9atCdXfOiUMYt/MrNg0/SHfKNAPxoQNDCx+j7ie68ztVUlcqsv/nBy4GdXfOiUMZ9cdwXSOanRbZ9f6nBBxOCzn0kKJaZX/v5ViizHHzvd6y79UWYBl5+hpsvAII2iwVB/Q7zCmVWny+qCxqdIXkd6xbfZ3ztewyKoC1hQNC534lyocztxLPF3qpBPY91a/w62WurlgEZ9ZMk7ypqU2Y1jm+ornZilc/tWLFMVUE5SWoW9W4mv66fvW17OlDctaiJ9/oubMqsp9WbeLqZmqUJQaMazX2KkQHZaoUit761YfFtvAUtlHEd9V4XBAplqnbUV4kAvOBSJ5gGQcE0CAqmQVAwDYKCaRAUTIOgYBoEBdMgKJgGQcE0CAqmQVAwDYKCaRAUTIOgYBoEBdMgKJgGQcE0CAqmQVAwDYKCaRAUTIOgYBoEBdMgKJgGQcE0CAqmQVAwDYKCaRAUTIOgYJr/Ax/MWwHT3DDUAAAAAElFTkSuQmCC" /><!-- --></p>
 <p>From the plot above, we see that random forest (rf) performs the best among our models. Random forest is an ensemble method that builds many trees and takes the average prediction from all the trees. The result is better prediction accuracy for our problem type. The poorest performing models are <code>lda</code> and <code>rpart</code>, which we will omit from our final model.</p>
+<div id="confusion-matrix-and-error-rate" class="section level3">
+<h3>Confusion Matrix and Error Rate</h3>
+<p>We calculate the confusion matrix by comparing the fitted <code>fit.rf</code> model with our testSmall dataset.</p>
+<pre class="r"><code>confusionMatrix(predict(fit.rf, testSmall3),testSmall3$classe)</code></pre>
+<pre><code>## Confusion Matrix and Statistics
+## 
+##           Reference
+## Prediction    A    B    C    D    E
+##          A 1668   13    2    0    0
+##          B    5 1113    9    0    0
+##          C    1   13 1012   35    0
+##          D    0    0    3  922    7
+##          E    0    0    0    7 1075
+## 
+## Overall Statistics
+##                                           
+##                Accuracy : 0.9839          
+##                  95% CI : (0.9803, 0.9869)
+##     No Information Rate : 0.2845          
+##     P-Value [Acc &gt; NIR] : &lt; 2.2e-16       
+##                                           
+##                   Kappa : 0.9796          
+##  Mcnemar's Test P-Value : NA              
+## 
+## Statistics by Class:
+## 
+##                      Class: A Class: B Class: C Class: D Class: E
+## Sensitivity            0.9964   0.9772   0.9864   0.9564   0.9935
+## Specificity            0.9964   0.9971   0.9899   0.9980   0.9985
+## Pos Pred Value         0.9911   0.9876   0.9538   0.9893   0.9935
+## Neg Pred Value         0.9986   0.9945   0.9971   0.9915   0.9985
+## Prevalence             0.2845   0.1935   0.1743   0.1638   0.1839
+## Detection Rate         0.2834   0.1891   0.1720   0.1567   0.1827
+## Detection Prevalence   0.2860   0.1915   0.1803   0.1584   0.1839
+## Balanced Accuracy      0.9964   0.9871   0.9881   0.9772   0.9960</code></pre>
+</div>
 </div>
 <div id="predicting-testing-data" class="section level2">
 <h2>Predicting Testing Data</h2>
@@ -643,31 +725,31 @@ pred.vote &lt;- apply(results,1,function(v) {
 results &lt;- mutate(results,vote=pred.vote)
 print(results)</code></pre>
 <pre><code>##    pred.rf pred.nnet pred.svm pred.gbm pred.bag pred.cart pred.knn vote
-## 1        B         A        A        A        A         B        B    A
+## 1        B         A        A        A        B         B        B    B
 ## 2        A         A        A        A        A         A        A    A
 ## 3        A         A        A        A        A         A        A    A
 ## 4        A         A        A        A        A         A        A    A
 ## 5        A         A        A        A        A         A        A    A
-## 6        E         A        C        E        E         E        E    E
-## 7        D         A        A        D        D         D        D    D
+## 6        E         B        C        D        E         E        E    E
+## 7        D         B        D        A        A         D        D    D
 ## 8        B         A        A        B        B         B        B    B
 ## 9        A         A        A        A        A         A        A    A
 ## 10       A         A        A        A        A         A        A    A
-## 11       B         A        A        A        A         B        B    A
-## 12       A         A        A        A        A         A        C    A
+## 11       B         A        A        A        B         A        B    A
+## 12       A         A        A        C        A         A        A    A
 ## 13       B         B        A        B        B         B        B    B
 ## 14       A         A        A        A        A         A        A    A
-## 15       E         C        D        D        E         E        E    E
-## 16       E         E        D        E        A         E        E    E
+## 15       E         D        D        E        E         E        E    E
+## 16       E         C        D        A        B         E        E    E
 ## 17       A         A        A        A        A         A        A    A
 ## 18       B         A        A        B        B         B        B    B
-## 19       B         A        A        A        B         B        B    B
+## 19       B         A        A        B        B         B        B    B
 ## 20       B         B        B        B        B         B        B    B</code></pre>
 </div>
 </div>
 <div id="conclusion" class="section level2">
 <h2>Conclusion</h2>
-<p>We find the Random Forest model the most accurate for this problem type (90% accuracy on testing set). Unsurprisingly, the simple “vote” model we build above wasn’t as accurate (80% only) as the <strong>rf</strong> model because it doesn’t take into account the accuracy of each model in assigning weights for their predictions. Generally, models with a higher accuracy should be weighted higher than models with low accuracy.</p>
+<p>We find the Random Forest model the most accurate for this problem type (90% accuracy on testing set). We don’t expect the Vote model above to make any improvement to the prediction as it has the same prediction as <strong>rf</strong> model. However, a simple vote mechanism is insufficient for a good prediction because it doesn’t take into account the accuracy of each model in assigning weights for their predictions. Generally, models with a higher accuracy should be weighted higher than models with low accuracy when casting a vote.</p>
 <p>We submit the following answer from <code>rf</code> model to our quiz.</p>
 <div id="answers" class="section level3">
 <h3>Answers</h3>

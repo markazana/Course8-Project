@@ -31,7 +31,32 @@ Before we begin, let's load all the necessary libraries we need to model.
 
 ```r
 library(caret)
+```
+
+```
+## Loading required package: lattice
+```
+
+```
+## Loading required package: ggplot2
+```
+
+```r
 library(caretEnsemble)
+```
+
+```
+## 
+## Attaching package: 'caretEnsemble'
+```
+
+```
+## The following object is masked from 'package:ggplot2':
+## 
+##     autoplot
+```
+
+```r
 library(mlbench)
 ```
 
@@ -443,6 +468,18 @@ names(trainSmall2)[corrIdx] # these are the columns which are 80% correlated
 ## Model Specification
 We will build a couple of models from the training data. The first step is to set the same training control parameters to be used across all the models.
 
+### Data Partitioning
+Before we begin, we split the ```training``` dataset into a smaller trainSmall and testSmall dataset with the NA columns removed.
+
+
+```r
+inTrain <- createDataPartition(y = training$classe, p = 0.7, list = FALSE)
+trainingSet <- training[inTrain,]
+testingSet <- training[-inTrain,]
+trainSmall3 <- trainingSet[,!naCols]
+testSmall3 <- testingSet[,!naCols]
+```
+
 ### Cross Validation
 We select the **Leave-group-out cross validation** method for our pre-processing. Leave Group Out cross-validation (LGOCV), is similar to Leave One Out cross-validation, but the algorithm will randomly leave out some percentage of the data repeatedly. It is different form k-folds as the selection of data rows is random (Monte Carlo cv). We set 75% (```p=0.75```) of the data for training and the rest for validation.
 
@@ -460,7 +497,7 @@ Training can be slow, so we are enabling parallel processing before training the
 
 ```r
 library(doParallel)
-cl <- makeCluster(4) # detectCores() # Please disable HyperThreading
+cl <- makeCluster(detectCores()) # Please disable HyperThreading
 registerDoParallel(cl)
 ```
 
@@ -470,51 +507,165 @@ We can now train a couple of models from our training data. We set the seed and 
 ```r
 # LDA
 set.seed(123)
-fit.lda <- train(classe ~ .,method="lda", preProcess=c("pca","center","scale"), data=trainSmall, trControl=trControl)
+fit.lda <- train(classe ~ .,method="lda", preProcess=c("pca","center","scale"), data=trainSmall3, trControl=trControl)
+```
+
+```
+## Loading required package: MASS
+```
+
+```r
 # Random Forests
 set.seed(123)
-fit.rf <- train(classe ~ .,method="rf", preProcess=c("pca","center","scale"), data=trainSmall, trControl=trControl)
+fit.rf <- train(classe ~ .,method="rf", preProcess=c("pca","center","scale"), data=trainSmall3, trControl=trControl)
+```
+
+```
+## Loading required package: randomForest
+```
+
+```
+## randomForest 4.6-12
+```
+
+```
+## Type rfNews() to see new features/changes/bug fixes.
+```
+
+```
+## 
+## Attaching package: 'randomForest'
+```
+
+```
+## The following object is masked from 'package:ggplot2':
+## 
+##     margin
+```
+
+```r
 # Neural Networks
 set.seed(123)
-fit.nnet <- train(classe ~ ., method="nnet", preProcess=c("pca","center","scale"), data=trainSmall, trControl= trControl, verbose=FALSE)
+fit.nnet <- train(classe ~ ., method="nnet", preProcess=c("pca","center","scale"), data=trainSmall3, trControl= trControl, verbose=FALSE)
+```
+
+```
+## Loading required package: nnet
 ```
 
 ```
 ## # weights:  140
-## initial  value 37299.330530 
-## iter  10 value 14460.653452
-## iter  20 value 10993.444205
-## iter  30 value 9199.373266
-## iter  40 value 8709.407967
-## iter  50 value 8209.131228
-## iter  60 value 7884.357952
-## iter  70 value 7382.702864
-## iter  80 value 6864.818231
-## iter  90 value 6348.468680
-## iter 100 value 5985.455912
-## final  value 5985.455912 
+## initial  value 23149.182408 
+## iter  10 value 8772.125087
+## iter  20 value 5430.962700
+## iter  30 value 4691.686011
+## iter  40 value 4252.657487
+## iter  50 value 4014.500407
+## iter  60 value 3739.105485
+## iter  70 value 3397.577033
+## iter  80 value 3196.260763
+## iter  90 value 3011.700122
+## iter 100 value 2886.091747
+## final  value 2886.091747 
 ## stopped after 100 iterations
 ```
 
 ```r
 # SVM (Radial)
 set.seed(123)
-fit.svm <- train(classe ~ .,method="svmRadial", preProc=c("pca","center","scale"), data=trainSmall, trControl=trControl)
+fit.svm <- train(classe ~ .,method="svmRadial", preProc=c("pca","center","scale"), data=trainSmall3, trControl=trControl)
+```
+
+```
+## Loading required package: kernlab
+```
+
+```
+## 
+## Attaching package: 'kernlab'
+```
+
+```
+## The following object is masked from 'package:ggplot2':
+## 
+##     alpha
+```
+
+```r
 # Stochastic Gradient Boosting
 set.seed(123)
-fit.gbm <- train(classe ~ .,method="gbm", preProcess=c("pca","center","scale"), data=trainSmall, trControl=trControl, verbose=FALSE)
+fit.gbm <- train(classe ~ .,method="gbm", preProcess=c("pca","center","scale"), data=trainSmall3, trControl=trControl, verbose=FALSE)
+```
+
+```
+## Loading required package: gbm
+```
+
+```
+## Loading required package: survival
+```
+
+```
+## 
+## Attaching package: 'survival'
+```
+
+```
+## The following object is masked from 'package:caret':
+## 
+##     cluster
+```
+
+```
+## Loading required package: splines
+```
+
+```
+## Loaded gbm 2.1.3
+```
+
+```
+## Loading required package: plyr
+```
+
+```r
 # Bagging
 set.seed(123)
-fit.bag <- train(classe ~ .,method="treebag", preProcess=c("pca","center","scale"), data=trainSmall, trControl=trControl)
+fit.bag <- train(classe ~ .,method="treebag", preProcess=c("pca","center","scale"), data=trainSmall3, trControl=trControl)
+```
+
+```
+## Loading required package: ipred
+```
+
+```
+## Loading required package: e1071
+```
+
+```r
 # CART (C5.0) # http://www.statmethods.net/advstats/cart.html
 set.seed(123)
-fit.cart <- train(classe ~ .,method="C5.0", preProcess=c("pca","center","scale"), data=trainSmall, trControl=trControl)
+fit.cart <- train(classe ~ .,method="C5.0", preProcess=c("pca","center","scale"), data=trainSmall3, trControl=trControl)
+```
+
+```
+## Loading required package: C50
+```
+
+```r
 # RPart
 set.seed(123)
-fit.rpart <- train(classe ~ .,method="rpart", preProcess=c("pca","center","scale"), data=trainSmall, trControl=trControl)
+fit.rpart <- train(classe ~ .,method="rpart", preProcess=c("pca","center","scale"), data=trainSmall3, trControl=trControl)
+```
+
+```
+## Loading required package: rpart
+```
+
+```r
 # kNN
 set.seed(123)
-fit.knn <- train(classe ~ .,method="knn", preProcess=c("pca","center","scale"), data=trainSmall, trControl=trControl)
+fit.knn <- train(classe ~ .,method="knn", preProcess=c("pca","center","scale"), data=trainSmall3, trControl=trControl)
 # terminate parallel threads
 stopCluster(cl)
 ```
@@ -560,27 +711,27 @@ summary(single_results)
 ## 
 ## Accuracy 
 ##         Min. 1st Qu. Median   Mean 3rd Qu.   Max. NA's
-## lda   0.7631  0.7700 0.7735 0.7738  0.7785 0.7875    0
-## rf    0.9831  0.9857 0.9867 0.9868  0.9876 0.9896    0
-## nnet  0.8740  0.8929 0.9084 0.9062  0.9174 0.9396    0
-## svm   0.9596  0.9613 0.9641 0.9639  0.9659 0.9686    0
-## gbm   0.9105  0.9164 0.9201 0.9206  0.9250 0.9292    0
-## bag   0.9647  0.9682 0.9710 0.9711  0.9721 0.9814    0
-## cart  0.9794  0.9829 0.9841 0.9840  0.9847 0.9882    0
-## rpart 0.2845  0.2845 0.2845 0.2845  0.2845 0.2845    0
-## knn   0.9631  0.9684 0.9702 0.9706  0.9727 0.9763    0
+## lda   0.7463  0.7603 0.7643 0.7674  0.7769 0.7874    0
+## rf    0.9741  0.9782 0.9796 0.9799  0.9811 0.9878    0
+## nnet  0.8360  0.8948 0.9135 0.9077  0.9251 0.9429    0
+## svm   0.9470  0.9502 0.9554 0.9550  0.9592 0.9653    0
+## gbm   0.9056  0.9129 0.9179 0.9176  0.9214 0.9301    0
+## bag   0.9543  0.9563 0.9595 0.9608  0.9630 0.9767    0
+## cart  0.9717  0.9747 0.9776 0.9773  0.9787 0.9843    0
+## rpart 0.2843  0.2843 0.2843 0.2843  0.2843 0.2843    0
+## knn   0.9496  0.9528 0.9581 0.9582  0.9627 0.9677    0
 ## 
 ## Kappa 
 ##         Min. 1st Qu. Median   Mean 3rd Qu.   Max. NA's
-## lda   0.7007  0.7090 0.7137 0.7142  0.7199 0.7315    0
-## rf    0.9786  0.9819 0.9832 0.9833  0.9843 0.9868    0
-## nnet  0.8406  0.8648 0.8840 0.8813  0.8954 0.9237    0
-## svm   0.9489  0.9510 0.9546 0.9544  0.9569 0.9603    0
-## gbm   0.8868  0.8942 0.8989 0.8995  0.9050 0.9105    0
-## bag   0.9554  0.9598 0.9634 0.9634  0.9647 0.9765    0
-## cart  0.9739  0.9783 0.9799 0.9798  0.9807 0.9850    0
+## lda   0.6795  0.6970 0.7023 0.7061  0.7181 0.7311    0
+## rf    0.9672  0.9724 0.9742 0.9746  0.9761 0.9845    0
+## nnet  0.7922  0.8667 0.8906 0.8832  0.9053 0.9279    0
+## svm   0.9329  0.9370 0.9436 0.9430  0.9484 0.9561    0
+## gbm   0.8807  0.8897 0.8961 0.8957  0.9005 0.9116    0
+## bag   0.9422  0.9448 0.9488 0.9504  0.9532 0.9705    0
+## cart  0.9642  0.9679 0.9716 0.9713  0.9731 0.9801    0
 ## rpart 0.0000  0.0000 0.0000 0.0000  0.0000 0.0000    0
-## knn   0.9533  0.9600 0.9623 0.9628  0.9654 0.9701    0
+## knn   0.9362  0.9403 0.9469 0.9471  0.9528 0.9591    0
 ```
 
 ```r
@@ -590,6 +741,48 @@ bwplot(single_results)
 ![](CourseProject_files/figure-html/singleResults-1.png)<!-- -->
 
 From the plot above, we see that random forest (rf) performs the best among our models. Random forest is an ensemble method that builds many trees and takes the average prediction from all the trees. The result is better prediction accuracy for our problem type. The poorest performing models are ```lda``` and ```rpart```, which we will omit from our final model.
+
+### Confusion Matrix and Error Rate
+We calculate the confusion matrix by comparing the fitted ```fit.rf``` model with our testSmall dataset.
+
+
+```r
+confusionMatrix(predict(fit.rf, testSmall3),testSmall3$classe)
+```
+
+```
+## Confusion Matrix and Statistics
+## 
+##           Reference
+## Prediction    A    B    C    D    E
+##          A 1668   13    2    0    0
+##          B    5 1113    9    0    0
+##          C    1   13 1012   35    0
+##          D    0    0    3  922    7
+##          E    0    0    0    7 1075
+## 
+## Overall Statistics
+##                                           
+##                Accuracy : 0.9839          
+##                  95% CI : (0.9803, 0.9869)
+##     No Information Rate : 0.2845          
+##     P-Value [Acc > NIR] : < 2.2e-16       
+##                                           
+##                   Kappa : 0.9796          
+##  Mcnemar's Test P-Value : NA              
+## 
+## Statistics by Class:
+## 
+##                      Class: A Class: B Class: C Class: D Class: E
+## Sensitivity            0.9964   0.9772   0.9864   0.9564   0.9935
+## Specificity            0.9964   0.9971   0.9899   0.9980   0.9985
+## Pos Pred Value         0.9911   0.9876   0.9538   0.9893   0.9935
+## Neg Pred Value         0.9986   0.9945   0.9971   0.9915   0.9985
+## Prevalence             0.2845   0.1935   0.1743   0.1638   0.1839
+## Detection Rate         0.2834   0.1891   0.1720   0.1567   0.1827
+## Detection Prevalence   0.2860   0.1915   0.1803   0.1584   0.1839
+## Balanced Accuracy      0.9964   0.9871   0.9881   0.9772   0.9960
+```
 
 ## Predicting Testing Data
 The final step, we apply the testing dataset on each of our built models.
@@ -623,30 +816,30 @@ print(results)
 
 ```
 ##    pred.rf pred.nnet pred.svm pred.gbm pred.bag pred.cart pred.knn vote
-## 1        B         A        A        A        A         B        B    A
+## 1        B         A        A        A        B         B        B    B
 ## 2        A         A        A        A        A         A        A    A
 ## 3        A         A        A        A        A         A        A    A
 ## 4        A         A        A        A        A         A        A    A
 ## 5        A         A        A        A        A         A        A    A
-## 6        E         A        C        E        E         E        E    E
-## 7        D         A        A        D        D         D        D    D
+## 6        E         B        C        D        E         E        E    E
+## 7        D         B        D        A        A         D        D    D
 ## 8        B         A        A        B        B         B        B    B
 ## 9        A         A        A        A        A         A        A    A
 ## 10       A         A        A        A        A         A        A    A
-## 11       B         A        A        A        A         B        B    A
-## 12       A         A        A        A        A         A        C    A
+## 11       B         A        A        A        B         A        B    A
+## 12       A         A        A        C        A         A        A    A
 ## 13       B         B        A        B        B         B        B    B
 ## 14       A         A        A        A        A         A        A    A
-## 15       E         C        D        D        E         E        E    E
-## 16       E         E        D        E        A         E        E    E
+## 15       E         D        D        E        E         E        E    E
+## 16       E         C        D        A        B         E        E    E
 ## 17       A         A        A        A        A         A        A    A
 ## 18       B         A        A        B        B         B        B    B
-## 19       B         A        A        A        B         B        B    B
+## 19       B         A        A        B        B         B        B    B
 ## 20       B         B        B        B        B         B        B    B
 ```
 
 ## Conclusion
-We find the Random Forest model the most accurate for this problem type (90% accuracy on testing set). Unsurprisingly, the simple "vote" model we build above wasn't as accurate (80% only) as the **rf** model because it doesn't take into account the accuracy of each model in assigning weights for their predictions. Generally, models with a higher accuracy should be weighted higher than models with low accuracy.
+We find the Random Forest model the most accurate for this problem type (90% accuracy on testing set). We don't expect the Vote model above to make any improvement to the prediction as it has the same prediction as **rf** model. However, a simple vote mechanism is insufficient for a good prediction because it doesn't take into account the accuracy of each model in assigning weights for their predictions. Generally, models with a higher accuracy should be weighted higher than models with low accuracy when casting a vote.
 
 We submit the following answer from ```rf``` model to our quiz.
 
