@@ -1,0 +1,216 @@
+---
+title: "Wearable Tech Prediction Assignment"
+author: "Mark Huang"
+date: "April 24, 2017"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache=TRUE)
+setwd("D:/User Profiles/mpemark/Desktop/Cousera/Data Science Specialization/Course 8/Week4/Course Project")
+```
+
+## Executive Summary
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. In this project, we will use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants which were asked to perform barbell lifts correctly and incorrectly in 5 different ways.
+
+The goal of this project is to predict the manner in which they did the exercise.
+This is the **classe** variable in the training set. We attempt to train a couple of models and pick the best ones to predict the **casse** variable in the testing set.
+
+## Data Sources
+The training and testing datasets can be download from the locations below.
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+We attempt to download the above two files to load locally.
+
+```{r data1, echo=TRUE, eval=FALSE}
+urlTrain <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+urlTest <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+```
+
+## Loading Data
+Before we begin, let's load all the necessary libraries we need to model.
+
+```{r library, echo=TRUE, eval=TRUE}
+library(caret)
+library(caretEnsemble)
+library(mlbench)
+```
+
+Next, we attempt to load the downloaded files above in R.
+
+```{r data2, echo=TRUE, eval=TRUE}
+training = read.csv("pml-training.csv",na.strings=c("NA","#DIV/0!",""))
+testing = read.csv("pml-testing.csv",na.strings=c("NA","#DIV/0!",""))
+names(training)
+names(testing)
+```
+
+Notice from above that the ```training``` dataset had the **classe** variable whereas the ```testing``` dataset has the **problem_id** variable instead. The former variable is the value we want to predict with our model, while the latter variable identifies the **problem_id** to submit in the **20** question quiz later.
+
+## Data Profiling
+To build any prediction model, we need to understand the structure of our data. From the code below, we observe that many variables have **NA** values that we should omit from our training data.
+
+```{r profile1, echo=TRUE, eval=TRUE}
+str(training)
+```
+
+### NA Value Removal
+We build a list of these variables that contain mostly **NA** values that we should omit.
+
+```{r profile2, echo=TRUE, eval=TRUE}
+naCols <- sapply(seq_len(ncol(training)), function(x) if(sum(is.na(training[,x]))>0.5*nrow(training)) {return(TRUE)} else {return(FALSE)})
+trainSmall <- training[,!naCols]
+```
+
+We don't stop here because we don't want our data to contain any columns with **NA** values. We perform a row-by-row check on such 'dirty' data and remove them from our training set. We call our profiled training set ```trainSmall``` and use it for training our model.
+
+```{r profile3, echo=TRUE, eval=TRUE}
+naRows <- sapply(seq_len(nrow(trainSmall)), function(x) if(sum(is.na(trainSmall[1,]))>0) {return(TRUE)} else {return(FALSE)})
+trainSmall <- trainSmall[!naRows,]
+str(trainSmall)
+```
+
+### Collinear Analysis (PCA)
+Next, we want to uncover possible collinear variables in our training dataset. Collinear terms will increase the noise in our model and cause it to generalise poorly. To do so, we must first convert all variables in our training set to integers if they are not already integers. 
+
+```{r pca1, echo=TRUE, eval=TRUE}
+trainSmall2 <- subset(trainSmall,
+       user_name1=as.integer(trainSmall$user_name),
+       cvtd_timestamp1=as.integer(trainSmall$cvtd_timestamp),
+       new_window1=ifelse(trainSmall$new_window=="yes",1,0),
+       classe1=as.integer(trainSmall$classe)
+       )
+```
+
+We perform PCA on the converted dataset and output the collinear terms. The terms below demonstrate at least 80% collinearity. We want to remove these terms to have the remaining variables explain as much of the variance as possible.
+
+```{r pca2, echo=TRUE, eval=TRUE}
+corr <- cor(subset(trainSmall2,select=-c(user_name,cvtd_timestamp,new_window,classe)),method="pearson")
+corrIdx <- findCorrelation(corr,cutoff = 0.8)
+names(trainSmall2)[corrIdx] # these are the columns which are 80% correlated
+```
+
+## Model Specification
+We will build a couple of models from the training data. The first step is to set the same training control parameters to be used across all the models.
+
+### Cross Validation
+We select the **Leave-group-out cross validation** method for our pre-processing. Leave Group Out cross-validation (LGOCV), is similar to Leave One Out cross-validation, but the algorithm will randomly leave out some percentage of the data repeatedly. It is different form k-folds as the selection of data rows is random (Monte Carlo cv). We set 75% (```p=0.75```) of the data for training and the rest for validation.
+
+For pre-process option, we pass a threshold of 80% (```thresh=0.8```) as PCA option similar to our ```cutoff=0.8``` option in ```findCorrelation()``` above. The outcome of this step should be the same as running ```findCorrelation()``` directly.
+
+```{r cv, echo=TRUE, eval=TRUE}
+# http://appliedpredictivemodeling.com/blog/2014/11/27/vpuig01pqbklmi72b8lcl3ij5hj2qm
+trControl <- trainControl(method="LGOCV", p=0.75, preProcOptions=list(thresh=0.8), savePredictions = TRUE, allowParallel=TRUE)
+```
+
+### Training
+Training can be slow, so we are enabling parallel processing before training the models. The code below will automatically perform the necessary setup based on your machine hardware.
+
+```{r parallel, echo=TRUE, eval=TRUE}
+library(doParallel)
+cl <- makeCluster(4) # detectCores() # Please disable HyperThreading
+registerDoParallel(cl)
+```
+
+We can now train a couple of models from our training data. We set the seed and pre-process the data the **exact same way** for each model to ensure fairness and reproducability before training 9 models using different ML techniques below. They are ```lda, rf, nnet, svmRadial, gbm, treebag, C5.0, rpart, knn```.
+
+```{r model1, echo=TRUE, eval=TRUE}
+# LDA
+set.seed(123)
+fit.lda <- train(classe ~ .,method="lda", preProcess=c("pca","center","scale"), data=trainSmall, trControl=trControl)
+# Random Forests
+set.seed(123)
+fit.rf <- train(classe ~ .,method="rf", preProcess=c("pca","center","scale"), data=trainSmall, trControl=trControl)
+# Neural Networks
+set.seed(123)
+fit.nnet <- train(classe ~ ., method="nnet", preProcess=c("pca","center","scale"), data=trainSmall, trControl= trControl, verbose=FALSE)
+# SVM (Radial)
+set.seed(123)
+fit.svm <- train(classe ~ .,method="svmRadial", preProc=c("pca","center","scale"), data=trainSmall, trControl=trControl)
+# Stochastic Gradient Boosting
+set.seed(123)
+fit.gbm <- train(classe ~ .,method="gbm", preProcess=c("pca","center","scale"), data=trainSmall, trControl=trControl, verbose=FALSE)
+# Bagging
+set.seed(123)
+fit.bag <- train(classe ~ .,method="treebag", preProcess=c("pca","center","scale"), data=trainSmall, trControl=trControl)
+# CART (C5.0) # http://www.statmethods.net/advstats/cart.html
+set.seed(123)
+fit.cart <- train(classe ~ .,method="C5.0", preProcess=c("pca","center","scale"), data=trainSmall, trControl=trControl)
+# RPart
+set.seed(123)
+fit.rpart <- train(classe ~ .,method="rpart", preProcess=c("pca","center","scale"), data=trainSmall, trControl=trControl)
+# kNN
+set.seed(123)
+fit.knn <- train(classe ~ .,method="knn", preProcess=c("pca","center","scale"), data=trainSmall, trControl=trControl)
+# terminate parallel threads
+stopCluster(cl)
+```
+
+### Make a linear regression ensemble
+We attempt to build a greedy ensemble for prediction. However we see that ```caretStack()``` is still doesn't support multiclass problems because of problems building an optimization method. We hope that future releases will support this.
+
+```{r ensemble, echo=TRUE, eval=TRUE, error=TRUE}
+all.models <- list(fit.lda, fit.rf, fit.nnet, fit.svm, fit.gbm, fit.bag, fit.cart, fit.rpart, fit.knn)
+names(all.models) <- sapply(all.models, function(x) x$method)
+class(all.models) <- "caretList"
+# lack of multiclass support for caretStack
+# https://github.com/zachmayer/caretEnsemble/issues/8
+greedy_ensemble <- caretStack(all.models, method='glm', trControl=trainControl(method='cv'))
+#summary(greedy_ensemble)
+```
+
+
+## Evaluating Models
+After building the models in the previous step, we attempt to evaluate their performance among one another.
+
+```{r singleResults, echo=TRUE, eval=TRUE}
+single_results <- resamples(list(lda=fit.lda, rf=fit.rf, nnet=fit.nnet, svm=fit.svm, gbm=fit.gbm, bag=fit.bag, cart=fit.cart, rpart=fit.rpart, knn=fit.knn))
+summary(single_results)
+bwplot(single_results)
+```
+
+From the plot above, we see that random forest (rf) performs the best among our models. Random forest is an ensemble method that builds many trees and takes the average prediction from all the trees. The result is better prediction accuracy for our problem type. The poorest performing model are ```lda``` and ```rpart```.
+
+## Predicting Testing Data
+The final step, we apply the testing dataset on each of our built models.
+
+```{r testing1, eval=TRUE, echo=TRUE}
+# test performance against testing set
+pred.lda <- sapply(predict(fit.lda, testing),as.character)
+pred.rf <- sapply(predict(fit.rf, testing),as.character)
+pred.nnet <- sapply(predict(fit.nnet, testing),as.character)
+pred.svm <- sapply(predict(fit.svm, testing),as.character)
+pred.gbm <- sapply(predict(fit.gbm, testing),as.character)
+pred.bag <- sapply(predict(fit.bag, testing),as.character)
+pred.cart <- sapply(predict(fit.cart, testing),as.character)
+pred.knn <- sapply(predict(fit.knn, testing),as.character)
+```
+
+### Simple Voting Mechanism
+We attempt to build a simple voting mechanism to find a majority consensus across all the model predictions above. The ```pred.vote``` column contains the most populus value across each ```problem_id```.
+
+```{r testing2, eval=TRUE, echo=TRUE}
+library(plyr)
+results <- data.frame(pred.lda,pred.rf,pred.nnet,pred.svm,pred.gbm,pred.bag,pred.cart,pred.knn)
+pred.vote <- apply(results,1,function(v) {
+  uniqv <- unique(v)
+  as.factor(uniqv[which.max(tabulate(match(v, uniqv)))])
+})
+results <- mutate(results,pred.vote=pred.vote)
+print(results)
+```
+
+## Conclusion
+We find the Random Forest model the most accurate for this problem type (90% accuracy on testing set). Unsurprisingly, the simple "vote" model we build above wasn't as accurate as the **rf** model because it doesn't take into account the accuracy of each model in assigning weights for their predictions. Generally, models with a higher accuracy should be weighted higher than models with low accuracy.
+
+We submit the following answer from ```rf``` model to our quiz.
+
+### Answers
+```{r ans, eval=TRUE, echo=TRUE}
+print(results$pred.rf)
+```
