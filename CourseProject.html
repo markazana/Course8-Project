@@ -673,7 +673,7 @@ pred.cart &lt;- sapply(predict(fit.cart, testing),as.character)
 pred.knn &lt;- sapply(predict(fit.knn, testing),as.character)</code></pre>
 <div id="simple-voting-mechanism" class="section level3">
 <h3>Simple Voting Mechanism</h3>
-<p>We attempt to build a simple voting mechanism to find a majority consensus across all the model predictions above. The <code>pred.vote</code> column contains the most populus value across each <code>problem_id</code>.</p>
+<p>We attempt to build a simple voting mechanism to find a majority consensus across all the model predictions above. The <code>vote</code> column contains the most populus value across each <code>problem_id</code>.</p>
 <pre class="r"><code>library(plyr)
 results &lt;- data.frame(pred.rf,pred.nnet,pred.svm,pred.gbm,pred.bag,pred.cart,pred.knn)
 pred.vote &lt;- apply(results,1,function(v) {
