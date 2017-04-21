@@ -1,7 +1,7 @@
 ---
 title: "Wearable Tech Prediction Assignment"
 author: "Mark Huang"
-date: "April 24, 2017"
+date: "April 21, 2017"
 output:
   html_document: default
   pdf_document: default
@@ -174,14 +174,13 @@ summary(single_results)
 bwplot(single_results)
 ```
 
-From the plot above, we see that random forest (rf) performs the best among our models. Random forest is an ensemble method that builds many trees and takes the average prediction from all the trees. The result is better prediction accuracy for our problem type. The poorest performing model are ```lda``` and ```rpart```.
+From the plot above, we see that random forest (rf) performs the best among our models. Random forest is an ensemble method that builds many trees and takes the average prediction from all the trees. The result is better prediction accuracy for our problem type. The poorest performing models are ```lda``` and ```rpart```, which we will omit from our final model.
 
 ## Predicting Testing Data
 The final step, we apply the testing dataset on each of our built models.
 
 ```{r testing1, eval=TRUE, echo=TRUE}
 # test performance against testing set
-pred.lda <- sapply(predict(fit.lda, testing),as.character)
 pred.rf <- sapply(predict(fit.rf, testing),as.character)
 pred.nnet <- sapply(predict(fit.nnet, testing),as.character)
 pred.svm <- sapply(predict(fit.svm, testing),as.character)
@@ -196,17 +195,17 @@ We attempt to build a simple voting mechanism to find a majority consensus acros
 
 ```{r testing2, eval=TRUE, echo=TRUE}
 library(plyr)
-results <- data.frame(pred.lda,pred.rf,pred.nnet,pred.svm,pred.gbm,pred.bag,pred.cart,pred.knn)
+results <- data.frame(pred.rf,pred.nnet,pred.svm,pred.gbm,pred.bag,pred.cart,pred.knn)
 pred.vote <- apply(results,1,function(v) {
   uniqv <- unique(v)
   as.factor(uniqv[which.max(tabulate(match(v, uniqv)))])
 })
-results <- mutate(results,pred.vote=pred.vote)
+results <- mutate(results,vote=pred.vote)
 print(results)
 ```
 
 ## Conclusion
-We find the Random Forest model the most accurate for this problem type (90% accuracy on testing set). Unsurprisingly, the simple "vote" model we build above wasn't as accurate as the **rf** model because it doesn't take into account the accuracy of each model in assigning weights for their predictions. Generally, models with a higher accuracy should be weighted higher than models with low accuracy.
+We find the Random Forest model the most accurate for this problem type (90% accuracy on testing set). Unsurprisingly, the simple "vote" model we build above wasn't as accurate (80% only) as the **rf** model because it doesn't take into account the accuracy of each model in assigning weights for their predictions. Generally, models with a higher accuracy should be weighted higher than models with low accuracy.
 
 We submit the following answer from ```rf``` model to our quiz.
 
